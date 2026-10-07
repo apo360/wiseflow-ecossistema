@@ -1,0 +1,20 @@
+Então terei:
+ - composer create-project laravel/laravel wiseflow-portal (Autenticação Unificada (SSO))
+ - create project springboot:wiseflow-core-backend	-------------
+ - composer create-project laravel/laravel wiseflow-core-front	    |----> B2B
+ - composer create-project laravel/laravel wiseflow-contabilidade ---
+ - composer create-project laravel/laravel wiseflow-lite
+ - composer create-project laravel/laravel wiseflow-kixikila
+ - composer create-project laravel/laravel wiseflow-comparacao
+ 
+ou não se não for explica e qual é a melhor
+
+jwt-auth secret [EfZnWHs78lkB2Ur0IG6nlhwZugwgJPWgrCxxAawISsvFef12Zr0sE0aIR3KiYahX] set successfully.
+
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=wiseflow_auth
+DB_USERNAME=apolinario
+DB_PASSWORD=Sql_Solar.21
+

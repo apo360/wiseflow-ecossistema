@@ -1,0 +1,158 @@
+You are working inside an existing Laravel microservice called wiseflow-auth.
+
+CRITICAL CONTEXT
+================
+The system is already functional and stable:
+- Login works correctly
+- JWT authentication works (RSA, SSO, claims, refresh)
+- Portal integration is stable
+- DDD architecture is already implemented and working
+
+⚠️ DO NOT BREAK OR MODIFY ANY EXISTING AUTH FLOW
+
+SAFE MODE RULE
+==============
+This task is STRICTLY a CONTINUATION TASK.
+
+You are ONLY allowed to:
+- Add new features
+- Extend architecture
+- Add new fields in tb.users (migrate add filed on users)
+- Update model User
+- Add new modules/classes
+- Add new registration system
+- Add new strategies
+- Add new services
+
+You are NOT allowed to:
+- Modify login flow
+- Modify JWT generation
+- Modify existing AuthController login method
+- Modify existing token structure
+- Modify portal integration contract
+- Refactor existing working DDD components
+
+If any change is required in existing code:
+→ create adapters or wrappers instead of editing core logic
+
+OBJECTIVE
+=========
+Implement a FLEXIBLE, MODULE-AWARE REGISTRATION SYSTEM inside wiseflow-auth WITHOUT touching existing authentication.
+
+The system must support multiple registration rules depending on the module.
+
+EXAMPLES
+========
+
+Module: kixikila
+- name: required
+- phone: required
+- email: optional
+
+Module: finance
+- name: required
+- email: required
+- phone: optional
+
+Future modules may define custom rules.
+
+REQUIREMENTS
+============
+
+1. DESIGN EXTENSION ARCHITECTURE ONLY
+-------------------------------------
+Create new DDD components under:
+- Application/Registration
+- Domain/Registration
+- Infrastructure/Registration
+
+DO NOT modify existing Auth domain.
+
+2. IMPLEMENT STRATEGY PATTERN
+-----------------------------
+Create:
+- RegistrationStrategy interface
+- StrategyResolver
+- KixikilaRegistrationStrategy
+- FinanceRegistrationStrategy
+- DefaultRegistrationStrategy
+
+BUT:
+- Must not affect login/authentication flow
+
+3. CREATE NEW REGISTRATION FLOW ONLY
+-------------------------------------
+Create new endpoint:
+
+POST /api/register
+
+This endpoint must NOT reuse or modify login logic.
+
+4. VALIDATION RULES
+-------------------
+- email OR phone required globally
+- module defines additional rules
+- validation must be strategy-based
+
+5. TENANT INTEGRATION
+---------------------
+Registration may:
+- create user
+- create tenant association (via wiseflow_core integration layer)
+
+BUT:
+- must NOT modify existing auth JWT logic
+
+6. EVENT-DRIVEN EXTENSION
+-------------------------
+Create events:
+- UserRegistered
+- TenantAttached
+
+DO NOT modify existing events used by login system.
+
+7. RESPONSE FORMAT
+------------------
+New registration endpoint must return:
+
+{
+  "success": true,
+  "message": "...",
+  "data": {
+     "user_id": "...",
+     "module": "...",
+     "tenant_id": "..."
+  }
+}
+
+8. COMPATIBILITY RULE
+---------------------
+Ensure:
+- login still works exactly as before
+- JWT structure unchanged
+- portal integration unchanged
+- no breaking changes in existing controllers or services
+
+9. IMPLEMENTATION STRATEGY
+--------------------------
+Use:
+- Adapter pattern if needed
+- Service layer separation
+- New classes only
+
+10. OUTPUT REQUIREMENTS
+-----------------------
+Provide:
+- new files created
+- extensions added
+- DDD structure update (only additions)
+- registration flow explanation
+- API example
+- no changes to existing login system
+
+SUCCESS CRITERIA
+================
+- Existing login MUST remain 100% functional
+- New registration system works independently
+- Multi-module registration supported
+- No breaking changes in authentication system

@@ -1,0 +1,51 @@
+{
+    "name": "wiseflow/jwt-auth",
+    "description": "Middleware JWT compartilhado para microserviços WiseFlow",
+    "type": "library",
+    "license": "proprietary",
+    "authors": [
+        {
+            "name": "WiseFlow Team"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "firebase/php-jwt": "^6.0",
+        "illuminate/http": "^12.0",
+        "illuminate/redis": "^12.0",
+        "illuminate/routing": "^12.0",
+        "illuminate/support": "^12.0"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.0",
+        "laravel/pint": "^1.21",
+        "orchestra/testbench": "^10.0",
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "Wiseflow\\JwtAuth\\": "src/"
+        },
+        "files": [
+            "src/helpers.php"
+        ]
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Wiseflow\\JwtAuth\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "analyse": "phpstan analyse --memory-limit=512M",
+        "format": "pint"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Wiseflow\\JwtAuth\\JwtAuthServiceProvider"
+            ]
+        }
+    },
+    "minimum-stability": "stable"
+}

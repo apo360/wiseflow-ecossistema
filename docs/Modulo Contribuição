@@ -1,0 +1,42 @@
+# TODO - Contributions module hardening (fintech-grade)
+
+## Step 1 — Schema + integrity baseline
+- [x] Add corrective migration(s) to ensure `contribuicaos.status` supports: pending, paid, late, missed.
+- [x] Ensure columns exist for: `due_date`, `confirmed_at`, `late_fee_amount`, `uuid`, and any fields referenced by code.
+- [ ] Add DB-level uniqueness constraint for Rule 1: one contribution per member per cycle.
+
+
+## Step 2 — Contribution generation repair
+- [ ] Fix `ContributionGenerationService` to use `ContributionStatusEnum::PENDING`.
+- [ ] Add idempotency in generation: do not create duplicates for (cycle_id, membro_id).
+- [ ] Ensure UUID generation when `uuid` exists.
+- [ ] Ensure generation happens during group activation only (and enforce via callers/guard if activation is the entrypoint).
+
+## Step 3 — Confirmation action repair (financial integrity + idempotency)
+- [ ] In `ConfirmContributionAction`, guard transitions: only pending -> paid/late.
+- [ ] Add double-confirm protection: if already paid, no-op (or throw domain exception) and do not create ledger again.
+- [ ] Implement payment ledger entry generation (Rule 9) inside the same DB transaction.
+- [ ] Verify cycle closing only when all contributions are paid (Rule 10).
+- [ ] Use `lockForUpdate` appropriately for cycle closure and for preventing concurrent double confirmation.
+
+## Step 4 — DTO validation hardening
+- [ ] Strengthen `ConfirmContributionDTO::validate()` (status transitions, numeric precision, proof constraints if needed).
+
+## Step 5 — Model hardening
+- [ ] Update `Contribuicao` casts (status enum, due_date timestamps, confirmed_at, late_fee_amount casting).
+- [ ] Ensure model fillable aligns with migration.
+
+## Step 6 — Livewire + UI flow hardening
+- [ ] In `ConfirmPaymentModal`, authorize that contribution belongs to current cycle/group and is pending.
+- [ ] Remove/avoid trusting request token attribute without validation (server-side auth user resolution).
+- [ ] In `Contribution/Index`, ensure only current cycle contributions are loaded and enforce authorization server-side.
+- [ ] Replace hardcoded status strings in Blade with enum-driven mapping.
+
+## Step 7 — Routes/security
+- [ ] Verify routes for contributions listing and any confirmation endpoints exist and are authorized (if any controllers exist).
+
+## Step 8 — Tests
+- [ ] Add tests for: generation, due_date, amount, authorization, double-confirm, ledger creation, and cycle closing.
+- [ ] Run `php artisan test` and fix failures.
+
+

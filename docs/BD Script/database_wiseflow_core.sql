@@ -1,0 +1,272 @@
+CREATE DATABASE IF NOT EXISTS wiseflow_core;
+USE wiseflow_core;
+
+-- ============================================================
+-- Tabelas principais do ecossistema WiseFlow (wiseflow_core)
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- Tabela: tenants
+-- Descrição: Armazena as empresas/organizações (tenants)
+-- ------------------------------------------------------------
+CREATE TABLE `tenants` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `slug` varchar(100) NOT NULL COMMENT 'Identificador único (ex: empresa-xyz)',
+  `name` varchar(255) NOT NULL COMMENT 'Nome fantasia',
+  `status` tinyint(1) NOT NULL DEFAULT '1' COMMENT '0=inativo, 1=ativo',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `tenants_slug_unique` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela: roles
+-- Descrição: Papéis/funções no sistema (por tenant ou globais)
+-- ------------------------------------------------------------
+CREATE TABLE `roles` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned NULL COMMENT 'NULL = papel global',
+  `name` varchar(100) NOT NULL,
+  `slug` varchar(100) NOT NULL COMMENT 'Identificador único (ex: admin)',
+  `description` text NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `roles_slug_tenant_unique` (`slug`, `tenant_id`),
+  KEY `roles_tenant_id_foreign` (`tenant_id`),
+  CONSTRAINT `roles_tenant_id_foreign` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela: permissions
+-- Descrição: Permissões individuais (ex: view_reports)
+-- ------------------------------------------------------------
+CREATE TABLE `permissions` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `slug` varchar(100) NOT NULL COMMENT 'Identificador único (ex: edit_invoices)',
+  `description` text NULL,
+  `module` varchar(100) NULL COMMENT 'Agrupamento (finance, crm, etc)',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `permissions_slug_unique` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela: tenant_users
+-- Descrição: Associação entre utilizadores (do auth) e tenants
+-- ------------------------------------------------------------
+CREATE TABLE `tenant_users` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned NOT NULL,
+  `user_id` bigint unsigned NOT NULL COMMENT 'ID do user na BD wiseflow_auth',
+  `role_id` bigint unsigned NULL COMMENT 'Role principal dentro do tenant',
+  `is_owner` tinyint(1) NOT NULL DEFAULT '0' COMMENT 'Indica se é proprietário do tenant',
+  `joined_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `tenant_users_tenant_user_unique` (`tenant_id`, `user_id`),
+  KEY `tenant_users_role_id_foreign` (`role_id`),
+  CONSTRAINT `tenant_users_tenant_id_foreign` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `tenant_users_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela pivot: role_permission
+-- Descrição: Permissões atribuídas a um role
+-- ------------------------------------------------------------
+CREATE TABLE `role_permission` (
+  `role_id` bigint unsigned NOT NULL,
+  `permission_id` bigint unsigned NOT NULL,
+  PRIMARY KEY (`role_id`, `permission_id`),
+  KEY `role_permission_permission_id_foreign` (`permission_id`),
+  CONSTRAINT `role_permission_role_id_foreign` FOREIGN KEY (`role_id`) REFERENCES `roles` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `role_permission_permission_id_foreign` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela pivot: permission_user
+-- Descrição: Permissões atribuídas diretamente a um utilizador
+-- ------------------------------------------------------------
+CREATE TABLE `permission_user` (
+  `user_id` bigint unsigned NOT NULL COMMENT 'ID do user na BD wiseflow_auth',
+  `permission_id` bigint unsigned NOT NULL,
+  `tenant_id` bigint unsigned NULL COMMENT 'Opcional: restringe permissão a um tenant específico',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`user_id`, `permission_id`),
+  KEY `permission_user_permission_id_foreign` (`permission_id`),
+  KEY `permission_user_tenant_id_foreign` (`tenant_id`),
+  CONSTRAINT `permission_user_permission_id_foreign` FOREIGN KEY (`permission_id`) REFERENCES `permissions` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `permission_user_tenant_id_foreign` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela: modules (opcional, para gestão de módulos do sistema)
+-- ------------------------------------------------------------
+CREATE TABLE `modules` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `name` varchar(100) NOT NULL,
+  `slug` varchar(100) NOT NULL COMMENT 'Ex: finance, kixikila, auth',
+  `description` text NULL,
+  `is_active` tinyint(1) NOT NULL DEFAULT '1',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `modules_slug_unique` (`slug`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela pivot: tenant_modules
+-- Descrição: Módulos habilitados para cada tenant
+-- ------------------------------------------------------------
+CREATE TABLE `tenant_modules` (
+  `tenant_id` bigint unsigned NOT NULL,
+  `module_id` bigint unsigned NOT NULL,
+  `is_enabled` tinyint(1) NOT NULL DEFAULT '1',
+  `settings` json NULL COMMENT 'Configurações específicas do módulo para o tenant',
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`tenant_id`, `module_id`),
+  KEY `tenant_modules_module_id_foreign` (`module_id`),
+  CONSTRAINT `tenant_modules_tenant_id_foreign` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `tenant_modules_module_id_foreign` FOREIGN KEY (`module_id`) REFERENCES `modules` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela: settings (opcional, configurações gerais por tenant)
+-- ------------------------------------------------------------
+CREATE TABLE `settings` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned NOT NULL,
+  `key` varchar(100) NOT NULL,
+  `value` text NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `settings_tenant_key_unique` (`tenant_id`, `key`),
+  CONSTRAINT `settings_tenant_id_foreign` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------
+-- Tabela: audit_logs (opcional, auditoria de acções)
+-- ------------------------------------------------------------
+CREATE TABLE `audit_logs` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `tenant_id` bigint unsigned NULL,
+  `user_id` bigint unsigned NULL COMMENT 'ID do user no auth',
+  `action` varchar(100) NOT NULL,
+  `entity_type` varchar(100) NULL,
+  `entity_id` bigint unsigned NULL,
+  `old_values` json NULL,
+  `new_values` json NULL,
+  `ip_address` varchar(45) NULL,
+  `user_agent` text NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `audit_logs_tenant_id_index` (`tenant_id`),
+  KEY `audit_logs_user_id_index` (`user_id`),
+  KEY `audit_logs_action_index` (`action`),
+  CONSTRAINT `audit_logs_tenant_id_foreign` FOREIGN KEY (`tenant_id`) REFERENCES `tenants` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+-- ============================================================
+-- INSERTS DE TESTE PARA O ECOSSISTEMA WISEFLOW (CORE)
+-- ============================================================
+
+-- ------------------------------------------------------------
+-- 1. Inserir módulo Kixikila
+-- ------------------------------------------------------------
+INSERT INTO `modules` (`name`, `slug`, `description`, `is_active`, `created_at`, `updated_at`) VALUES
+('Kixikila', 'kixikila', 'Gestão de grupos de poupança e contribuições rotativas', 1, NOW(), NOW()),
+('Wise Lite', 'Lite', 'Gestão de Finanças Pessoal', 1, NOW(), NOW()),
+('Wise Empresa', 'Empresa', 'Gestão de Rendas Empresarial', 1, NOW(), NOW()),
+('Mercado', 'Comparação', 'Comparação de Produtos Bancarios', 1, NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 2. Inserir tenant "Kixikila Platform" (representa o serviço)
+-- ------------------------------------------------------------
+INSERT INTO `tenants` (`id`, `slug`, `name`, `status`, `created_at`, `updated_at`) VALUES
+(1, 'kixikila-platform', 'Plataforma Kixikila', 1, NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 3. Associar módulo Kixikila ao tenant
+-- ------------------------------------------------------------
+INSERT INTO `tenant_modules` (`tenant_id`, `module_id`, `is_enabled`, `settings`, `created_at`, `updated_at`) VALUES
+(1, 1, 1, NULL, NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 4. Inserir permissões específicas do módulo Kixikila
+-- ------------------------------------------------------------
+INSERT INTO `permissions` (`id`, `name`, `slug`, `description`, `module`, `created_at`, `updated_at`) VALUES
+(1, 'Ver grupos', 'view_groups', 'Visualizar grupos de poupança disponíveis', 'kixikila', NOW(), NOW()),
+(2, 'Criar grupo', 'create_group', 'Criar um novo grupo de poupança', 'kixikila', NOW(), NOW()),
+(3, 'Editar grupo', 'edit_group', 'Editar configurações do grupo', 'kixikila', NOW(), NOW()),
+(4, 'Convidar membros', 'invite_members', 'Convidar outros utilizadores para um grupo', 'kixikila', NOW(), NOW()),
+(5, 'Realizar contribuição', 'make_contribution', 'Efectuar uma contribuição para o grupo', 'kixikila', NOW(), NOW()),
+(6, 'Ver histórico', 'view_history', 'Ver histórico de contribuições e levantamentos', 'kixikila', NOW(), NOW()),
+(7, 'Solicitar levantamento', 'request_payout', 'Solicitar o montante acumulado', 'kixikila', NOW(), NOW()),
+(8, 'Gerir membros', 'manage_members', 'Remover ou aprovar membros do grupo', 'kixikila', NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 5. Inserir roles para o tenant Kixikila
+-- ------------------------------------------------------------
+INSERT INTO `roles` (`id`, `tenant_id`, `name`, `slug`, `description`, `created_at`, `updated_at`) VALUES
+(1, 1, 'Administrador Kixikila', 'admin-kixikila', 'Acesso total à gestão da plataforma', NOW(), NOW()),
+(2, 1, 'Membro Kixikila', 'member', 'Utilizador comum que participa em grupos', NOW(), NOW()),
+(3, 1, 'Organizador de Grupo', 'group-organizer', 'Utilizador que pode criar e gerir os seus próprios grupos', NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 6. Atribuir permissões aos roles
+-- ------------------------------------------------------------
+
+-- Role "Membro Kixikila" (member) -> permissões básicas
+INSERT INTO `role_permission` (`role_id`, `permission_id`) VALUES
+(2, 1),  -- view_groups
+(2, 5),  -- make_contribution
+(2, 6);  -- view_history
+
+-- Role "Organizador de Grupo" (group-organizer) -> permissões alargadas
+INSERT INTO `role_permission` (`role_id`, `permission_id`) VALUES
+(3, 1),  -- view_groups
+(3, 2),  -- create_group
+(3, 3),  -- edit_group
+(3, 4),  -- invite_members
+(3, 5),  -- make_contribution
+(3, 6),  -- view_history
+(3, 8);  -- manage_members
+
+-- Role "Administrador Kixikila" (admin-kixikila) -> todas as permissões
+INSERT INTO `role_permission` (`role_id`, `permission_id`)
+SELECT 1, id FROM permissions WHERE module = 'kixikila';
+
+-- ------------------------------------------------------------
+-- 7. Associar o utilizador (user_id=1) ao tenant Kixikila
+--    com o role "Membro Kixikila"
+-- ------------------------------------------------------------
+INSERT INTO `tenant_users` (`tenant_id`, `user_id`, `role_id`, `is_owner`, `joined_at`, `created_at`, `updated_at`) VALUES
+(1, 1, 2, 0, NOW(), NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 8. (Opcional) Conceder permissão extra directamente ao user 1
+--    Ex: Capacidade de criar grupos mesmo sem ser organizador
+-- ------------------------------------------------------------
+-- INSERT INTO `permission_user` (`user_id`, `permission_id`, `tenant_id`, `created_at`, `updated_at`) VALUES
+-- (1, 2, 1, NOW(), NOW());
+
+-- ------------------------------------------------------------
+-- 9. Inserir registo de auditoria inicial (opcional)
+-- ------------------------------------------------------------
+INSERT INTO `audit_logs` (`tenant_id`, `user_id`, `action`, `entity_type`, `entity_id`, `new_values`, `ip_address`, `created_at`) VALUES
+(1, 1, 'user_registered', 'tenant_users', 1, '{"role": "member"}', '127.0.0.1', NOW());
+
+-- ------------------------------------------------------------
+-- 10. Configurações básicas para o tenant Kixikila (opcional)
+-- ------------------------------------------------------------
+INSERT INTO `settings` (`tenant_id`, `key`, `value`, `created_at`, `updated_at`) VALUES
+(1, 'kixikila.default_currency', 'AOA', NOW(), NOW()),
+(1, 'kixikila.max_group_size', '20', NOW(), NOW());
